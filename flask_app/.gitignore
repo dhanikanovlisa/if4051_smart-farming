@@ -1,0 +1,42 @@
+# Bytecode / Cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual Environment
+venv/
+env/
+.venv/
+ENV/
+
+# Environment variables and secrets
+.env
+*.env
+
+# Flask instance folder (optional, if used)
+instance/
+*.sqlite3
+
+# VSCode & IDE stuff
+.vscode/
+.idea/
+
+# macOS / Linux / Windows OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Compiled files or object code
+*.so
+*.out
+*.o
+
+# InfluxDB tokens or config (if saved locally)
+*.influxdb.token
+*.config
+
+# Misc
+*.bak
+*.swp
