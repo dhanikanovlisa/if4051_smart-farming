@@ -31,7 +31,7 @@ def on_message(client, userdata, msg):
 
     try:
         payload = json.loads(last_message)
-        value = float(payload["field1"])  # extract from JSON
+        value = float(payload["temperature"])  # extract from JSON
         point = (
             Point("mqtt_measurement")  # consistent measurement name
             .field("field1", value)
