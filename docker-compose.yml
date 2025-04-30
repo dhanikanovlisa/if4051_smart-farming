@@ -1,40 +1,57 @@
 services:
   mqtt:
     image: eclipse-mosquitto
+    container_name: mqtt-broker
+    restart: unless-stopped
     ports:
-      - "1883:1883"
-      - "9001:9001"
+      - "${MQTT_PORT}:1883"
+      - "${MQTT_WS_PORT}:9001"
     volumes:
       - ./mosquitto:/mosquitto/config
 
   influxdb:
     image: influxdb:2.7
+    container_name: influxdb
+    restart: unless-stopped
     ports:
       - "8086:8086"
+    environment:
+      - INFLUXDB_BUCKET=${INFLUXDB_BUCKET}
+      - INFLUXDB_ORG=${INFLUXDB_ORG}
+      - INFLUXDB_USERNAME=${INFLUXDB_USERNAME}
+      - INFLUXDB_PASSWORD=${INFLUXDB_PASSWORD}
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
     volumes:
       - influxdb_data:/var/lib/influxdb2
-    environment:
-      - DOCKER_INFLUXDB_INIT_MODE=setup
-      - DOCKER_INFLUXDB_INIT_USERNAME=admin
-      - DOCKER_INFLUXDB_INIT_PASSWORD=adminpass
-      - DOCKER_INFLUXDB_INIT_ORG=myorg
-      - DOCKER_INFLUXDB_INIT_BUCKET=mybucket
-      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=mytoken
 
   flask:
     build: ./flask_app
-    ports:
-      - "5000:5000"
+    container_name: flask-app
+    restart: unless-stopped
+    expose:
+      - "5000" 
     depends_on:
       - mqtt
       - influxdb
     volumes:
       - ./flask_app:/app
     environment:
-      - INFLUX_URL=http://influxdb:8086
-      - INFLUX_TOKEN=mytoken
-      - INFLUX_ORG=myorg
-      - INFLUX_BUCKET=mybucket
+      - INFLUX_URL=http://influxdb:${INFLUXDB_PORT}
+      - INFLUX_TOKEN=${INFLUXDB_TOKEN}
+      - INFLUX_ORG=${INFLUXDB_ORG}
+      - INFLUX_BUCKET=${INFLUXDB_BUCKET}
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx-reverse-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - flask
+      - influxdb
 
 volumes:
   influxdb_data:
