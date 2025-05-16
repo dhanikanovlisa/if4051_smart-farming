@@ -1,0 +1,85 @@
+import torch
+import cv2
+import os
+from tensorflow.keras.models import load_model
+import numpy as np
+import tensorflow as tf
+
+
+# Load model YOLOv5
+model = torch.hub.load('ultralytics/yolov5', 'custom', path='D:/altha/Kuliah/Semester 8/if4051_smart-farming/plant-monitoring/lettuce_segmentation_model.pt')
+model.conf = 0.4
+
+
+# Load model 
+interpreter = tf.lite.Interpreter(model_path='D:/altha/Kuliah/Semester 8/if4051_smart-farming/plant-monitoring/lettuce_disease_model.tflite')
+interpreter.allocate_tensors()
+
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
+
+
+# Disease label
+disease_class_names = ['healthy', 'bacterical', 'fungal']
+
+
+# Input & Output Folder
+input_folder = r'D:\altha\Kuliah\Semester 8\if4051_smart-farming\plant-monitoring\input'
+output_folder = 'output'
+os.makedirs(output_folder, exist_ok=True)
+
+image_extensions = ['.jpg']
+image_files = [f for f in os.listdir(input_folder) if os.path.splitext(f)[1].lower() in image_extensions]
+
+# Image iteration
+for img_file in image_files:
+    img_full_path = os.path.join(input_folder, img_file)
+    img = cv2.imread(img_full_path)
+
+    if img is None:
+        print(f"Gagal membaca {img_file}")
+        continue
+
+    results = model(img)
+    detections = results.xyxy[0]
+    class_names = model.names
+    base_filename = os.path.splitext(img_file)[0]
+
+    for i, det in enumerate(detections):
+        x1, y1, x2, y2 = map(int, det[:4])
+        class_id = int(det[5])
+        isReady = "ready" if class_names[class_id] == "Lettuce-Ready-to-Harvest" else "not ready"
+
+        crop = img[y1:y2, x1:x2]
+        crop_rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+        resized = cv2.resize(crop_rgb, (200, 200))
+        input_array = np.array(resized, dtype=np.float32) / 255.0
+        input_array = np.expand_dims(input_array, axis=0)
+
+
+        # Set input
+        interpreter.set_tensor(input_details[0]['index'], input_array)
+
+        # Run inference
+        interpreter.invoke()
+
+        # Get output
+        output_data = interpreter.get_tensor(output_details[0]['index'])
+        predicted_class = disease_class_names[np.argmax(output_data)]
+
+        color = (0, 0, 255)
+
+
+        # Tulis label dan kotak ke gambar asli
+        label_text = f'{predicted_class} | {isReady}'
+        print(predicted_class, isReady)
+        cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
+        cv2.putText(img, label_text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+
+
+    output_img_path = os.path.join(output_folder, f'{base_filename}_boxed.jpg')
+    cv2.imwrite(output_img_path, img)
+    print(f"Disimpan: {output_img_path}")
+        
+
+print("END")
