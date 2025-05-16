@@ -29,7 +29,7 @@ services:
     container_name: flask-app
     restart: unless-stopped
     expose:
-      - "5000" 
+      - "5000"
     depends_on:
       - mqtt
       - influxdb
@@ -40,6 +40,17 @@ services:
       - INFLUX_TOKEN=${INFLUXDB_TOKEN}
       - INFLUX_ORG=${INFLUXDB_ORG}
       - INFLUX_BUCKET=${INFLUXDB_BUCKET}
+
+  grafana:
+    image: grafana/grafana-oss
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - influxdb
+    volumes:
+      - grafana_data:/var/lib/grafana
 
   nginx:
     image: nginx:alpine
@@ -52,6 +63,8 @@ services:
     depends_on:
       - flask
       - influxdb
+      - grafana
 
 volumes:
   influxdb_data:
+  grafana_data:
