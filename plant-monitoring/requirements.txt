@@ -1,3 +1,7 @@
 opencv-python
 paho-mqtt
 numpy
+torch
+tensorflow 
+pandas  
+pillow

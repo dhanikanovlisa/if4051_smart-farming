@@ -19,15 +19,7 @@ bucket = os.getenv("INFLUX_BUCKET")
 
 influx_client = InfluxDBClient(url=influx_url, token=token, org=org)
 write_api = influx_client.write_api()
-payload = {
-    "sensor_id": "node_1",
-    "temperature": 26.7,
-    "humidity": 60.3,
-    "co2_ppm": 432.5,
-    "moisture_percent": 42.1,
-    "lux": 785.3,
-    "timestamp": datetime.utcnow().isoformat() + "Z"  # ISO 8601 UTC timestamp
-}
+
 
 @app.route("/")
 def hello():
@@ -49,7 +41,6 @@ def write_data():
             "sensor_id": "node_1",
             "temperature": round(25 + random.uniform(-2, 2), 2),
             "humidity": round(60 + random.uniform(-5, 5), 2),
-            "co2_ppm": round(400 + random.uniform(-20, 20), 2),
             "moisture_percent": round(40 + random.uniform(-5, 5), 2),
             "lux": round(700 + random.uniform(-100, 100), 2),
             "timestamp": datetime.utcnow().replace(tzinfo=timezone.utc)
@@ -60,7 +51,6 @@ def write_data():
             .tag("sensor_id", payload["sensor_id"])
             .field("temperature", payload["temperature"])
             .field("humidity", payload["humidity"])
-            .field("co2_ppm", payload["co2_ppm"])
             .field("moisture_percent", payload["moisture_percent"])
             .field("lux", payload["lux"])
             .time(payload["timestamp"])
