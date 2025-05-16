@@ -1,5 +1,16 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include "DHT.h"
+#include <Wire.h>
+#include <BH1750.h>
+
+#define DHTPIN 5     // Pin where the DHT22 data pin is connected
+#define DHTTYPE DHT22   // DHT 22 (AM2302)
+
+DHT dht(DHTPIN, DHTTYPE);
+BH1750 lightMeter;
+const int dryValue = 4095;   // Value when sensor is dry (in air)
+const int wetValue = 1800;   // Value when sensor is fully submerged in water
 
 // WiFi credentials
 const char *ssid = "Rumah Nurul Baru";
@@ -84,6 +95,9 @@ void setup() {
   setup_wifi();
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
+  dht.begin();
+  Wire.begin();
+  lightMeter.begin();
 }
 
 void loop() {
@@ -92,11 +106,28 @@ void loop() {
   }
   client.loop();
 
-  // Simulated temperature data
-  float temperature = random(200, 300) / 10.0;
+  // Sensor data
+  float humidity = dht.readHumidity();
+  float temperature = dht.readTemperature();
+  //float lux = lightMeter.readLightLevel();
+  float lux = 4.0;
+  int sensorValue = analogRead(4);
+  int moisturePercent = map(sensorValue, dryValue, wetValue, 0, 100);
+  moisturePercent = constrain(moisturePercent, 0, 100);
+
+  if (isnan(humidity) || isnan(temperature)) {
+    Serial.println("Failed to read from DHT sensor!");
+    return;
+  }
 
   // Build JSON-style payload
-  String payload = "{\"temperature\":" + String(temperature, 2) + "}";
+  String payload = "{\"sensor_id\": \"node_1\",
+      \"temperature\":" + String(temperature,2) + 
+      ", \"humidity\":" + String(humidity, 2) +
+      ", \"moisture_percent\":" + String(moisture,2) +
+      ", \"lux\":" + String(lux,2) +
+      ", \"timestamp\": \"2025-05-07T13:00:00Z\"}";
+
 
   // Publish to MQTT topic
   if (client.publish("esp32/sensor1", payload.c_str())) {
