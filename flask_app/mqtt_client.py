@@ -2,7 +2,8 @@ import paho.mqtt.client as mqtt
 import threading
 import os
 import json
-from influxdb_client import InfluxDBClient, Point, WriteOptions
+from dateutil import parser
+from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 from config.config import MQTT_BROKER_IP, MQTT_BROKER_PORT, MQTT_TOPIC
 
@@ -31,10 +32,36 @@ def on_message(client, userdata, msg):
 
     try:
         payload = json.loads(last_message)
-        value = float(payload["temperature"])  # extract from JSON
+        '''
+        Example payload
+        {
+            "sensor_id": "node_1",
+            "temperature": 26.7,
+            "humidity": 60.3,
+            "co2_ppm": 432.5,
+            "moisture_percent": 42.1,
+            "lux": 785.3,
+            "timestamp": "2025-05-07T13:00:00Z"
+        }
+
+        '''
+        sensor_id = payload["sensor_id"]
+        temperature = payload["temperature"]
+        humidity = payload["humidity"]
+        co2_ppm = payload["co2_ppm"]
+        moisture_percent = payload["moisture_percent"]
+        lux = payload["lux"]
+        timestamp = parser.isoparse(payload["timestamp"]) 
         point = (
-            Point("mqtt_measurement")  # consistent measurement name
-            .field("field1", value)
+            Point("mqtt_measurement")  
+            .tag("sensor_id", sensor_id)
+            .field("temperature", temperature)
+            .field("humidity", humidity)
+            .field("co2_ppm", co2_ppm)
+            .field("moisture_percent", moisture_percent)
+            .field("lux", lux)
+            .time(timestamp, WritePrecision.NS)  # Use nanoseconds for timestamp
+            
         )
         write_api.write(bucket=bucket, org=org, record=point)
         print("✅ Written to InfluxDB")

@@ -3,8 +3,9 @@ from influxdb_client import InfluxDBClient, Point, WriteOptions
 from influxdb_client.client.write_api import SYNCHRONOUS
 import os
 import time
+from datetime import datetime, timezone
 import mqtt_client 
-
+import random
 # Flask App
 app = Flask(__name__)
 
@@ -18,6 +19,15 @@ bucket = os.getenv("INFLUX_BUCKET")
 
 influx_client = InfluxDBClient(url=influx_url, token=token, org=org)
 write_api = influx_client.write_api()
+payload = {
+    "sensor_id": "node_1",
+    "temperature": 26.7,
+    "humidity": 60.3,
+    "co2_ppm": 432.5,
+    "moisture_percent": 42.1,
+    "lux": 785.3,
+    "timestamp": datetime.utcnow().isoformat() + "Z"  # ISO 8601 UTC timestamp
+}
 
 @app.route("/")
 def hello():
@@ -34,19 +44,33 @@ def write_data_mqtt():
 def write_data():
     write_api = influx_client.write_api(write_options=SYNCHRONOUS)
 
-    points = []
-    for value in range(5):
+    for i in range(5):
+        payload = {
+            "sensor_id": "node_1",
+            "temperature": round(25 + random.uniform(-2, 2), 2),
+            "humidity": round(60 + random.uniform(-5, 5), 2),
+            "co2_ppm": round(400 + random.uniform(-20, 20), 2),
+            "moisture_percent": round(40 + random.uniform(-5, 5), 2),
+            "lux": round(700 + random.uniform(-100, 100), 2),
+            "timestamp": datetime.utcnow().replace(tzinfo=timezone.utc)
+        }
+
         point = (
-            Point("measurement1")
-            .tag("tagname1", "tagvalue1")
-            .field("field1", value)
+            Point("sensor_data")
+            .tag("sensor_id", payload["sensor_id"])
+            .field("temperature", payload["temperature"])
+            .field("humidity", payload["humidity"])
+            .field("co2_ppm", payload["co2_ppm"])
+            .field("moisture_percent", payload["moisture_percent"])
+            .field("lux", payload["lux"])
+            .time(payload["timestamp"])
         )
-        points.append(point)
-        time.sleep(1)
 
-    write_api.write(bucket="mybucket", org="myorg", record=points)
+    write_api.write(bucket=bucket, org="myorg", record=point)
+    print(f"✅ Data written at {payload['timestamp']}")
+    time.sleep(1)  # Simulate delay between data points
 
-    return jsonify(message="Data written to InfluxDB successfully")
+    return jsonify(message="Payload-based data written to InfluxDB successfully")
 
 @app.route("/read_data")
 def read_data():
@@ -54,13 +78,15 @@ def read_data():
 
     query = """
     from(bucket: "mybucket")
-    |> range(start: -10m)
-    |> filter(fn: (r) => r._measurement == "mqtt_measurement")
+    |> range(start: -1h)
+    |> filter(fn: (r) => r._measurement == "sensor_data")
+    |> filter(fn: (r) => r["sensor_id"] == "node_1")
     """
+
     
     tables = query_api.query(query, org="myorg")
-
     data = []
+    print(data)
     for table in tables:
         for record in table.records:
             data.append({
