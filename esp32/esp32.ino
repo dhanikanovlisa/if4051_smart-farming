@@ -1,23 +1,21 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include "DHT.h"
-#include <Wire.h>
-#include <BH1750.h>
+// #include <Wire.h>
+// #include <BH1750.h>
 
 #define DHTPIN 5     // Pin where the DHT22 data pin is connected
 #define DHTTYPE DHT22   // DHT 22 (AM2302)
-
+#define SOIL_MOISTURE_PIN 32
 DHT dht(DHTPIN, DHTTYPE);
-BH1750 lightMeter;
-const int dryValue = 4095;   // Value when sensor is dry (in air)
-const int wetValue = 1800;   // Value when sensor is fully submerged in water
+// BH1750 lightMeter;
 
 // WiFi credentials
-const char *ssid = "Rumah Nurul Baru";
-const char *password = "baru22122";
+const char *ssid = "Aidha’s iPhone";
+const char *password = "lisawifi";
 
 // MQTT Broker details
-const char *mqtt_server = "192.168.18.115";
+const char *mqtt_server = "212.85.26.216";
 const int mqtt_port = 1883;
 
 // LED pin (added since you're using blink_led function)
@@ -88,16 +86,25 @@ void reconnect() {
   }
 }
 
+int getSoilMoisture()
+{
+  int rawValue = analogRead(SOIL_MOISTURE_PIN);
+  Serial.print("raw value : ");
+  Serial.println(rawValue);
+  return map(rawValue, 4095, 0, 0, 100); // Adjust based on your sensor's calibration
+}
+
 void setup() {
-  pinMode(ledPin, OUTPUT);
   Serial.begin(115200);
+  pinMode(ledPin, OUTPUT);
+  pinMode(SOIL_MOISTURE_PIN, INPUT);
 
   setup_wifi();
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
   dht.begin();
-  Wire.begin();
-  lightMeter.begin();
+  // Wire.begin();
+  // lightMeter.begin();
 }
 
 void loop() {
@@ -111,23 +118,21 @@ void loop() {
   float temperature = dht.readTemperature();
   //float lux = lightMeter.readLightLevel();
   float lux = 4.0;
-  int sensorValue = analogRead(4);
-  int moisturePercent = map(sensorValue, dryValue, wetValue, 0, 100);
-  moisturePercent = constrain(moisturePercent, 0, 100);
-
+  int moisturePercent = getSoilMoisture();
+  Serial.print(" | Moisture: ");
+  Serial.println(moisturePercent);
+  
   if (isnan(humidity) || isnan(temperature)) {
     Serial.println("Failed to read from DHT sensor!");
     return;
   }
 
   // Build JSON-style payload
-  String payload = "{\"sensor_id\": \"node_1\",
-      \"temperature\":" + String(temperature,2) + 
-      ", \"humidity\":" + String(humidity, 2) +
-      ", \"moisture_percent\":" + String(moisture,2) +
-      ", \"lux\":" + String(lux,2) +
-      ", \"timestamp\": \"2025-05-07T13:00:00Z\"}";
-
+  String payload = "{\"sensor_id\": \"node_1\", \"temperature\":" + String(temperature, 2) + 
+    ", \"humidity\":" + String(humidity, 2) + 
+    ", \"moisture_percent\":" + String(moisturePercent) + 
+    ", \"lux\":" + String(lux, 2) + 
+    ", \"timestamp\": \"2025-05-07T13:00:00Z\"}";
 
   // Publish to MQTT topic
   if (client.publish("esp32/sensor1", payload.c_str())) {
@@ -136,5 +141,5 @@ void loop() {
     Serial.println("Publish failed");
   }
 
-  delay();  // Wait 3 seconds between publishes
+  delay(3000);  // Wait 3 seconds between publishes
 }
