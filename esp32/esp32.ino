@@ -1,26 +1,31 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include "DHT.h"
-// #include <Wire.h>
-// #include <BH1750.h>
+#include <Wire.h>
+#include <BH1750.h>
 #include "time.h"
 
 #define DHTPIN 5     // Pin where the DHT22 data pin is connected
 #define DHTTYPE DHT22   // DHT 22 (AM2302)
 #define SOIL_MOISTURE_PIN 32
 DHT dht(DHTPIN, DHTTYPE);
-// BH1750 lightMeter;
+BH1750 lightMeter;
 
 // WiFi credentials
-const char *ssid = "Aidha’s iPhone";
-const char *password = "lisawifi";
+const char *ssid = "LANTAI 3";
+const char *password = "lantaitiga";
 
 // MQTT Broker details
-const char *mqtt_server = "212.85.26.216";
+const char *mqtt_server = "192.168.0.127";
 const int mqtt_port = 1883;
 
 // LED pin (added since you're using blink_led function)
 const int ledPin = 2;  // Typically GPIO2 on many ESP32 boards
+
+const int pumpPin = 18;
+bool pumpOn = false;
+unsigned long pumpStartTime = 0;
+const unsigned long pumpDuration = 5000; // 5 seconds
 
 // MQTT client
 WiFiClient espClient;
@@ -113,6 +118,8 @@ String getFormattedTime() {
 void setup() {
   Serial.begin(115200);
   pinMode(ledPin, OUTPUT);
+  pinMode(pumpPin, OUTPUT);
+  digitalWrite(pumpPin, LOW);
   pinMode(SOIL_MOISTURE_PIN, INPUT);
 
   setup_wifi();
@@ -120,8 +127,8 @@ void setup() {
   client.setCallback(callback);
   dht.begin();
   configTime(21600, 3600, "pool.ntp.org");
-  // Wire.begin();
-  // lightMeter.begin();
+  Wire.begin();
+  lightMeter.begin();
 }
 
 void loop() {
@@ -133,8 +140,8 @@ void loop() {
   // Sensor data
   float humidity = dht.readHumidity();
   float temperature = dht.readTemperature();
-  //float lux = lightMeter.readLightLevel();
-  float lux = random(10);
+  float lux = lightMeter.readLightLevel();
+//  float lux = random(10);
   int moisturePercent = getSoilMoisture();
   // Serial.print(" | Time :  ");
   // Serial.println(moisturePercent);
@@ -152,13 +159,27 @@ void loop() {
     ", \"lux\":" + String(lux, 2) + 
     ", \"timestamp\": \""+getFormattedTime()+"\"}";
 
-  if(lux<5){
+  if(lux<20){
     digitalWrite(ledPin, HIGH);
   }
   else{
     digitalWrite(ledPin, LOW);
   }
 
+  if (moisturePercent < 20 && !pumpOn) {
+    Serial.println("Turning on pump (non-blocking)");
+    digitalWrite(pumpPin, HIGH);
+    pumpStartTime = millis();
+    pumpOn = true;
+  }
+  
+  // Turn off pump after pumpDuration
+  if (pumpOn && millis() - pumpStartTime >= pumpDuration) {
+    Serial.println("Turning off pump");
+    digitalWrite(pumpPin, LOW);
+    pumpOn = false;
+  }
+ 
   // Publish to MQTT topic
   if (client.publish("esp32/sensor1", payload.c_str())) {
     Serial.println("Published: " + payload);
