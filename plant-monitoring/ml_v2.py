@@ -1,5 +1,3 @@
-from pathlib import Path
-import pathlib
 import torch
 import cv2
 import os
@@ -8,8 +6,6 @@ import numpy as np
 import tensorflow as tf
 
 
-temp = pathlib.WindowsPath
-pathlib.WindowsPath = pathlib.PosixPath
 
 # Load model YOLOv5
 model = torch.hub.load('ultralytics/yolov5', 'custom', path='D:/altha/Kuliah/Semester 8/if4051_smart-farming/plant-monitoring/lettuce_segmentation_model.pt')
