@@ -12,17 +12,17 @@ DHT dht(DHTPIN, DHTTYPE);
 BH1750 lightMeter;
 
 // WiFi credentials
-const char *ssid = "LANTAI 3";
-const char *password = "lantaitiga";
+const char *ssid = "bitha";
+const char *password = "fqww3362";
 
 // MQTT Broker details
-const char *mqtt_server = "192.168.0.127";
+const char *mqtt_server = "212.85.26.216";
 const int mqtt_port = 1883;
 
 // LED pin (added since you're using blink_led function)
 const int ledPin = 2;  // Typically GPIO2 on many ESP32 boards
 
-const int pumpPin = 18;
+const int pumpPin = 26;
 bool pumpOn = false;
 unsigned long pumpStartTime = 0;
 const unsigned long pumpDuration = 5000; // 5 seconds
@@ -168,7 +168,7 @@ void loop() {
 
   if (moisturePercent < 20 && !pumpOn) {
     Serial.println("Turning on pump (non-blocking)");
-    digitalWrite(pumpPin, HIGH);
+    digitalWrite(pumpPin, LOW);
     pumpStartTime = millis();
     pumpOn = true;
   }
@@ -176,7 +176,7 @@ void loop() {
   // Turn off pump after pumpDuration
   if (pumpOn && millis() - pumpStartTime >= pumpDuration) {
     Serial.println("Turning off pump");
-    digitalWrite(pumpPin, LOW);
+    digitalWrite(pumpPin, HIGH);
     pumpOn = false;
   }
  
