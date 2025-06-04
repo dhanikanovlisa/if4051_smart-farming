@@ -12,12 +12,12 @@ temp = pathlib.WindowsPath
 pathlib.WindowsPath = pathlib.PosixPath
 
 # Load model YOLOv5
-model = torch.hub.load('ultralytics/yolov5', 'custom', path='D:/altha/Kuliah/Semester 8/if4051_smart-farming/plant-monitoring/lettuce_segmentation_model.pt')
+model = torch.hub.load('ultralytics/yolov5', 'custom', path='/home/dhanikalisa/projects/python/if4051_smart-farming/plant-monitoring/lettuce_segmentation_model.pt')
 model.conf = 0.4
 
 
 # Load model 
-interpreter = tf.lite.Interpreter(model_path='D:/altha/Kuliah/Semester 8/if4051_smart-farming/plant-monitoring/lettuce_disease_model_v2.tflite')
+interpreter = tf.lite.Interpreter(model_path='/home/dhanikalisa/projects/python/if4051_smart-farming/plant-monitoring/lettuce_disease_model.tflite')
 interpreter.allocate_tensors()
 
 input_details = interpreter.get_input_details()
@@ -29,7 +29,7 @@ disease_class_names = ['disease', 'healthy']
 
 
 # Input & Output Folder
-input_folder = r'D:\altha\Kuliah\Semester 8\if4051_smart-farming\plant-monitoring\input'
+input_folder = r'/home/dhanikalisa/projects/python/if4051_smart-farming/plant-monitoring/input'
 output_folder = 'output'
 os.makedirs(output_folder, exist_ok=True)
 
