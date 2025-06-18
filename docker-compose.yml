@@ -1,14 +1,4 @@
 services:
-  mqtt:
-    image: eclipse-mosquitto
-    container_name: mqtt-broker
-    restart: unless-stopped
-    ports:
-      - "${MQTT_PORT}:1883"
-      - "${MQTT_WS_PORT}:9001"
-    volumes:
-      - ./mosquitto:/mosquitto/config
-
   influxdb:
     image: influxdb:2.7
     container_name: influxdb
@@ -24,23 +14,6 @@ services:
     volumes:
       - influxdb_data:/var/lib/influxdb2
 
-  flask:
-    build: ./flask_app
-    container_name: flask-app
-    restart: unless-stopped
-    expose:
-      - "5000"
-    depends_on:
-      - mqtt
-      - influxdb
-    volumes:
-      - ./flask_app:/app
-    environment:
-      - INFLUX_URL=http://influxdb:${INFLUXDB_PORT}
-      - INFLUX_TOKEN=${INFLUXDB_TOKEN}
-      - INFLUX_ORG=${INFLUXDB_ORG}
-      - INFLUX_BUCKET=${INFLUXDB_BUCKET}
-
   grafana:
     image: grafana/grafana-oss
     container_name: grafana
@@ -52,18 +25,25 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
 
-  nginx:
-    image: nginx:alpine
-    container_name: nginx-reverse-proxy
+  mqtt-listener:
+    build: ./mqtt-subscriber
+    container_name: mqtt-listener
     restart: unless-stopped
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - flask
       - influxdb
-      - grafana
+    environment:
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
+      - INFLUXDB_ORG=${INFLUXDB_ORG}
+      - INFLUXDB_BUCKET=${INFLUXDB_BUCKET}
+      - INFLUXDB_URL=http://influxdb:8086
+      - MQTT_BROKER=broker.emqx.io
+      - MQTT_PORT=1883
+      - MQTT_TOPIC=${MQTT_TOPIC}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./mqtt-subscriber:/app
+    working_dir: /app
+    command: ["python", "-u", "main.py"]
 
 volumes:
   influxdb_data:
