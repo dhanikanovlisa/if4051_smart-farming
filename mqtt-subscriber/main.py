@@ -26,7 +26,7 @@ def on_message(client, userdata, msg):
     try:
         # Decode the MQTT payload and parse it as JSON
         payload = msg.payload.decode('utf-8')
-        data = json.loads(payload)  # Convert string to dictionary
+        data = json.loads(payload) 
         
         # Extract the data fields
         print(f"[MQTT] Data: {data}")
@@ -38,7 +38,6 @@ def on_message(client, userdata, msg):
         naive_timestamp = parser.isoparse(data["timestamp"])
         timestamp_with_tz = naive_timestamp.replace(tzinfo=WIB_TZ)
 
-        # InfluxDB expects UTC. Convert the timezone-aware timestamp to UTC
         timestamp_utc = timestamp_with_tz.astimezone(tz.gettz("UTC"))
 
 
@@ -50,7 +49,7 @@ def on_message(client, userdata, msg):
             .field("humidity", humidity)
             .field("moisture_percent", moisture_percent)
             .field("lux", lux)
-            .time(timestamp_utc, WritePrecision.NS)  # Use nanoseconds for timestamp
+            .time(timestamp_utc, WritePrecision.NS) 
         )
 
         # Write the point to InfluxDB
