@@ -5,187 +5,131 @@
 #include <BH1750.h>
 #include "time.h"
 
-#define DHTPIN 5     // Pin where the DHT22 data pin is connected
-#define DHTTYPE DHT22   // DHT 22 (AM2302)
+#define DHTPIN 5
+#define DHTTYPE DHT22
 #define SOIL_MOISTURE_PIN 32
+#define LED_PIN 2
+
 DHT dht(DHTPIN, DHTTYPE);
 BH1750 lightMeter;
 
-// WiFi credentials
-const char *ssid = "bitha";
-const char *password = "fqww3362";
-
-// MQTT Broker details
-const char *mqtt_server = "212.85.26.216";
+const char *ssid = "LANTAI 3";
+const char *password = "lantaitiga";
+const char *mqtt_server = "broker.emqx.io";
 const int mqtt_port = 1883;
 
-// LED pin (added since you're using blink_led function)
-const int ledPin = 2;  // Typically GPIO2 on many ESP32 boards
-
-const int pumpPin = 26;
-bool pumpOn = false;
-unsigned long pumpStartTime = 0;
-const unsigned long pumpDuration = 5000; // 5 seconds
-
-// MQTT client
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-//Time 
+// Time
 const char* ntpServer = "pool.ntp.org";
-const long  gmtOffset_sec = 3600;
-const int   daylightOffset_sec = 3600;
 
 void setup_wifi() {
-  delay(10);
-  Serial.println("Connecting to WiFi...");
+  Serial.print("Connecting to WiFi: ");
+  Serial.println(ssid);
   WiFi.begin(ssid, password);
-
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
-
   Serial.println("\nWiFi connected!");
-  Serial.print("IP address: ");
+  Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
-}
-
-// LED blink function (added since you're using it)
-void blink_led(int times, int duration) {
-  for (int i = 0; i < times; i++) {
-    digitalWrite(ledPin, HIGH);
-    delay(duration);
-    digitalWrite(ledPin, LOW);
-    delay(duration);
-  }
-}
-
-// MQTT callback function (added since you're using it)
-void callback(char* topic, byte* payload, unsigned int length) {
-  Serial.print("Message arrived [");
-  Serial.print(topic);
-  Serial.print("] ");
-  
-  for (int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
-  }
-  Serial.println();
 }
 
 void reconnect() {
   while (!client.connected()) {
-    if (WiFi.status() != WL_CONNECTED) {
-      // If not connected, first connect to WiFi
-      setup_wifi();
-    }
-
     Serial.print("Attempting MQTT connection...");
-    if (client.connect("ESP32_client1")) { 
-      Serial.println("connected");
-      // Subscribe to topics
-      client.subscribe("rpi/broadcast");
-    } 
-    else {
-      Serial.print("failed, rc=");
+    setup_wifi();
+    if (client.connect("ESP32_sensor")) {
+      Serial.println("Connected to MQTT broker");
+    } else {
+      Serial.print("Failed, rc=");
       Serial.print(client.state());
-      Serial.println(" trying again in 2 seconds");
-      
-      blink_led(3, 200); 
+      Serial.println(" - trying again in 2 seconds");
       delay(2000);
     }
   }
 }
 
-int getSoilMoisture()
-{
+int getSoilMoisture() {
   int rawValue = analogRead(SOIL_MOISTURE_PIN);
-  return map(rawValue, 4095, 0, 0, 100); // Adjust based on your sensor's calibration
+  int moisturePercent = map(rawValue, 4095, 0, 0, 100);
+  Serial.print("Soil Moisture Raw: ");
+  Serial.print(rawValue);
+  Serial.print(" -> Mapped: ");
+  Serial.println(moisturePercent);
+  return moisturePercent;
 }
 
 String getFormattedTime() {
   struct tm timeinfo;
-  if(!getLocalTime(&timeinfo)){
+  if (!getLocalTime(&timeinfo)) {
     Serial.println("Failed to obtain time");
     return "";
   }
-  
-  char timeString[30];
-  strftime(timeString, sizeof(timeString), "%Y-%m-%d %H:%M:%S", &timeinfo);
-  return String(timeString);
+  char buffer[30];
+  strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
+  return String(buffer);
 }
 
 void setup() {
   Serial.begin(115200);
-  pinMode(ledPin, OUTPUT);
-  pinMode(pumpPin, OUTPUT);
-  digitalWrite(pumpPin, LOW);
+  pinMode(LED_PIN, OUTPUT);
   pinMode(SOIL_MOISTURE_PIN, INPUT);
 
+  Serial.println("Initializing sensors...");
   setup_wifi();
   client.setServer(mqtt_server, mqtt_port);
-  client.setCallback(callback);
   dht.begin();
-  configTime(21600, 3600, "pool.ntp.org");
   Wire.begin();
   lightMeter.begin();
+  configTime(21600, 3600, ntpServer);
+  Serial.println("Setup complete.");
 }
 
 void loop() {
-  if (!client.connected()) {
-    reconnect();
-  }
+  if (!client.connected()) reconnect();
   client.loop();
 
-  // Sensor data
   float humidity = dht.readHumidity();
   float temperature = dht.readTemperature();
   float lux = lightMeter.readLightLevel();
-//  float lux = random(10);
-  int moisturePercent = getSoilMoisture();
-  // Serial.print(" | Time :  ");
-  // Serial.println(moisturePercent);
-  // Serial.println(getFormattedTime());
-  
+  int moisture = getSoilMoisture();
+
+  Serial.print("Temperature: ");
+  Serial.print(temperature);
+  Serial.print(" °C, Humidity: ");
+  Serial.print(humidity);
+  Serial.print(" %, Lux: ");
+  Serial.println(lux);
+
   if (isnan(humidity) || isnan(temperature)) {
     Serial.println("Failed to read from DHT sensor!");
     return;
   }
 
-  // Build JSON-style payload
-  String payload = "{\"sensor_id\": \"node_1\", \"temperature\":" + String(temperature, 2) + 
-    ", \"humidity\":" + String(humidity, 2) + 
-    ", \"moisture_percent\":" + String(moisturePercent) + 
-    ", \"lux\":" + String(lux, 2) + 
-    ", \"timestamp\": \""+getFormattedTime()+"\"}";
-
-  if(lux<20){
-    digitalWrite(ledPin, HIGH);
-  }
-  else{
-    digitalWrite(ledPin, LOW);
-  }
-
-  if (moisturePercent < 20 && !pumpOn) {
-    Serial.println("Turning on pump (non-blocking)");
-    digitalWrite(pumpPin, LOW);
-    pumpStartTime = millis();
-    pumpOn = true;
-  }
-  
-  // Turn off pump after pumpDuration
-  if (pumpOn && millis() - pumpStartTime >= pumpDuration) {
-    Serial.println("Turning off pump");
-    digitalWrite(pumpPin, HIGH);
-    pumpOn = false;
-  }
- 
-  // Publish to MQTT topic
-  if (client.publish("esp32/sensor1", payload.c_str())) {
-    Serial.println("Published: " + payload);
+  // LED control
+  if (lux < 20) {
+    digitalWrite(LED_PIN, HIGH);
+    Serial.println("Ambient light low: LED ON");
   } else {
-    Serial.println("Publish failed");
+    digitalWrite(LED_PIN, LOW);
+    Serial.println("Ambient light sufficient: LED OFF");
   }
 
-  delay(3000);  // Wait 3 seconds between publishes
+  String payload = "{\"sensor_id\":\"node_1\",\"temperature\":" + String(temperature, 2) +
+                   ",\"humidity\":" + String(humidity, 2) +
+                   ",\"moisture_percent\":" + String(moisture) +
+                   ",\"lux\":" + String(lux, 2) +
+                   ",\"timestamp\":\"" + getFormattedTime() + "\"}";
+
+  if (client.publish("esp32/smartfarming/sensor", payload.c_str())) {
+    Serial.println("MQTT publish success:");
+    Serial.println(payload);
+  } else {
+    Serial.println("MQTT publish failed");
+  }
+
+  delay(3000);
 }
